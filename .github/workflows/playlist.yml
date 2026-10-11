@@ -1,0 +1,149 @@
+name: Playlist tools
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: Playlist operation
+        type: choice
+        required: true
+        default: duplicates
+        options:
+          - duplicates
+          - backup
+          - sort
+          - compare
+          - merge
+      playlist_id:
+        description: Spotify playlist ID (empty uses the repository variable)
+        type: string
+        required: false
+      sort_by:
+        description: Sort key (used by sort)
+        type: choice
+        required: false
+        default: release-date
+        options:
+          - release-date
+          - title
+          - artist
+          - album
+          - duration
+          - added-at
+      sort_order:
+        description: Sort direction (default is descending for dates, ascending otherwise)
+        type: choice
+        required: false
+        default: default
+        options:
+          - default
+          - asc
+          - desc
+      other_playlist_id:
+        description: Second playlist ID (required by compare)
+        type: string
+        required: false
+      source_playlist_ids:
+        description: Source playlist IDs separated by spaces or newlines (required by merge)
+        type: string
+        required: false
+  schedule:
+    - cron: "0 2 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spotify-playlist-operations
+  cancel-in-progress: false
+
+jobs:
+  playlist:
+    if: github.event_name == 'workflow_dispatch' || vars.SPOTIFY_ENABLE_SCHEDULE == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.13.0"
+          python-version: "3.12"
+          enable-cache: false
+      - run: uv sync --locked --no-dev
+      - name: Run playlist operation
+        id: operation
+        env:
+          COMMAND: ${{ github.event_name == 'schedule' && 'sort' || inputs.command }}
+          SORT_BY: ${{ github.event_name == 'schedule' && (vars.SPOTIFY_SORT_BY || 'release-date') || inputs.sort_by }}
+          SORT_ORDER: ${{ github.event_name == 'schedule' && (vars.SPOTIFY_SORT_ORDER || 'default') || inputs.sort_order }}
+          OTHER_PLAYLIST_ID: ${{ inputs.other_playlist_id }}
+          SOURCE_PLAYLIST_IDS: ${{ inputs.source_playlist_ids }}
+          SPOTIFY_PLAYLIST_ID: ${{ inputs.playlist_id || vars.SPOTIFY_PLAYLIST_ID }}
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+          SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          if [[ ! "$SPOTIFY_PLAYLIST_ID" =~ ^[A-Za-z0-9]{22}$ ]]; then
+            echo "SPOTIFY_PLAYLIST_ID must be a 22-character Spotify playlist ID containing only letters and numbers." >&2
+            exit 1
+          fi
+          case "$COMMAND" in
+            duplicates)
+              uv run --locked --no-dev spot-on duplicates --playlist-id "$SPOTIFY_PLAYLIST_ID" | tee reports/duplicates.json
+              ;;
+            backup)
+              uv run --locked --no-dev spot-on backup --playlist-id "$SPOTIFY_PLAYLIST_ID" --backup-dir backups | tee reports/backup.json
+              ;;
+            sort)
+              sort_args=(sort --playlist-id "$SPOTIFY_PLAYLIST_ID" --by "$SORT_BY" --backup-dir backups)
+              if [[ "$SORT_ORDER" != "default" && -n "$SORT_ORDER" ]]; then
+                sort_args+=(--order "$SORT_ORDER")
+              fi
+              uv run --locked --no-dev spot-on "${sort_args[@]}" | tee reports/sort.json
+              ;;
+            compare)
+              if [[ ! "$OTHER_PLAYLIST_ID" =~ ^[A-Za-z0-9]{22}$ ]]; then
+                echo "other_playlist_id is required by compare and must be a 22-character Spotify playlist ID containing only letters and numbers." >&2
+                exit 1
+              fi
+              uv run --locked --no-dev spot-on compare --playlist-id "$SPOTIFY_PLAYLIST_ID" --other-playlist-id "$OTHER_PLAYLIST_ID" | tee reports/compare.json
+              ;;
+            merge)
+              source_ids=()
+              while read -r -a line_ids; do
+                source_ids+=("${line_ids[@]}")
+              done <<< "$SOURCE_PLAYLIST_IDS"
+              if [[ "${#source_ids[@]}" -eq 0 ]]; then
+                echo "source_playlist_ids must contain at least one source playlist ID for merge." >&2
+                exit 1
+              fi
+              merge_args=(merge --playlist-id "$SPOTIFY_PLAYLIST_ID" --backup-dir backups)
+              for source_id in "${source_ids[@]}"; do
+                if [[ ! "$source_id" =~ ^[A-Za-z0-9]{22}$ ]]; then
+                  echo "Every source_playlist_ids entry must be a 22-character Spotify playlist ID containing only letters and numbers: $source_id" >&2
+                  exit 1
+                fi
+                merge_args+=(--source-playlist-id "$source_id")
+              done
+              uv run --locked --no-dev spot-on "${merge_args[@]}" | tee reports/merge.json
+              ;;
+            *)
+              echo "Unsupported playlist command: $COMMAND" >&2
+              exit 1
+              ;;
+          esac
+      - name: Save reports and backups
+        if: always() && steps.operation.outcome != 'skipped'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: spot-on-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            backups/
+            reports/
+          if-no-files-found: error
+          retention-days: 30

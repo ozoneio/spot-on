@@ -1,0 +1,44 @@
+{
+  "jobs": [
+    {
+      "id": "merge-discovery",
+      "schedule": {
+        "weekdays": ["fri"],
+        "hour_utc": 2
+      },
+      "operation": {
+        "command": "merge",
+        "playlist_id": "1111111111111111111111",
+        "source_playlist_ids": ["2222222222222222222222", "3333333333333333333333"]
+      }
+    },
+    {
+      "id": "sort-favorites",
+      "schedule": {
+        "weekdays": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+        "hour_utc": 3
+      },
+      "operation": {
+        "command": "sort",
+        "playlist_id": "1111111111111111111111",
+        "sort_by": "artist",
+        "order": "asc"
+      }
+    },
+    {
+      "id": "compare-listening",
+      "operation": {
+        "command": "compare",
+        "playlist_id": "1111111111111111111111",
+        "other_playlist_id": "2222222222222222222222"
+      }
+    },
+    {
+      "id": "check-duplicates",
+      "operation": {
+        "command": "duplicates",
+        "playlist_id": "1111111111111111111111"
+      }
+    }
+  ]
+}
