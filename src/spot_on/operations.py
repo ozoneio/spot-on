@@ -1,5 +1,6 @@
 """Spotify operations that capture a consistent order and preserve track membership."""
 
+import time
 from pathlib import Path
 
 from spot_on.backups import PlaylistBackup, write_backup
@@ -20,9 +21,18 @@ def read_playlist(
     return playlist, entries
 
 
+SNAPSHOT_RETRY_DELAYS = (1, 2, 4)
+
+
 def assert_snapshot(client: SpotifyClient, playlist_id: str, snapshot_id: str) -> None:
     """Detect concurrent playlist edits before making an order-dependent request."""
     current = client.playlist(playlist_id)
+    # Spotify reads lag just after a write, returning the previous snapshot; re-read before failing.
+    for delay in SNAPSHOT_RETRY_DELAYS:
+        if current.snapshot_id == snapshot_id:
+            return
+        time.sleep(delay)
+        current = client.playlist(playlist_id)
     if current.snapshot_id != snapshot_id:
         raise PlaylistError(
             f"Playlist {playlist_id} changed concurrently: expected snapshot {snapshot_id!r}, "
