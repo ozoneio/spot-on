@@ -1,0 +1,29 @@
+name: Compare playlists
+
+on:
+  workflow_dispatch:
+    inputs:
+      playlist_id:
+        description: Spotify playlist ID (empty uses the SPOTIFY_PLAYLIST_ID variable)
+        type: string
+        required: false
+      other_playlist_id:
+        description: Second playlist ID to compare against
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spotify-playlist-operations
+  cancel-in-progress: false
+
+jobs:
+  run:
+    uses: ./.github/workflows/run.yml
+    with:
+      command: compare
+      playlist_id: ${{ inputs.playlist_id }}
+      other_playlist_id: ${{ inputs.other_playlist_id }}
+    secrets: inherit

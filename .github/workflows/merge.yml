@@ -1,0 +1,29 @@
+name: Merge playlists
+
+on:
+  workflow_dispatch:
+    inputs:
+      playlist_id:
+        description: Destination playlist ID (empty uses the SPOTIFY_PLAYLIST_ID variable)
+        type: string
+        required: false
+      source_playlist_ids:
+        description: Source playlist IDs separated by spaces or newlines
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spotify-playlist-operations
+  cancel-in-progress: false
+
+jobs:
+  run:
+    uses: ./.github/workflows/run.yml
+    with:
+      command: merge
+      playlist_id: ${{ inputs.playlist_id }}
+      source_playlist_ids: ${{ inputs.source_playlist_ids }}
+    secrets: inherit

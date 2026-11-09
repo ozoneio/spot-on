@@ -1,0 +1,24 @@
+name: Back up playlist
+
+on:
+  workflow_dispatch:
+    inputs:
+      playlist_id:
+        description: Spotify playlist ID (empty uses the SPOTIFY_PLAYLIST_ID variable)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spotify-playlist-operations
+  cancel-in-progress: false
+
+jobs:
+  run:
+    uses: ./.github/workflows/run.yml
+    with:
+      command: backup
+      playlist_id: ${{ inputs.playlist_id }}
+    secrets: inherit

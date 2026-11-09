@@ -1,0 +1,47 @@
+name: Sort playlist
+
+on:
+  workflow_dispatch:
+    inputs:
+      playlist_id:
+        description: Spotify playlist ID (empty uses the SPOTIFY_PLAYLIST_ID variable)
+        type: string
+        required: false
+      sort_by:
+        description: Sort key
+        type: choice
+        required: true
+        default: release-date
+        options:
+          - release-date
+          - title
+          - artist
+          - album
+          - duration
+          - added-at
+      sort_order:
+        description: Sort direction (default is descending for dates, ascending otherwise)
+        type: choice
+        required: true
+        default: default
+        options:
+          - default
+          - asc
+          - desc
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spotify-playlist-operations
+  cancel-in-progress: false
+
+jobs:
+  run:
+    uses: ./.github/workflows/run.yml
+    with:
+      command: sort
+      playlist_id: ${{ inputs.playlist_id }}
+      sort_by: ${{ inputs.sort_by }}
+      sort_order: ${{ inputs.sort_order }}
+    secrets: inherit

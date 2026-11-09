@@ -99,16 +99,14 @@ uv run --env-file .env spot-on batch-due --config batch.json --backup-dir backup
    | `SPOTIFY_CLIENT_SECRET` | Your Spotify app's client secret |
    | `SPOTIFY_REFRESH_TOKEN` | Your account's refresh token |
 
-3. Add a repository variable named `SPOTIFY_PLAYLIST_ID` for your default playlist. Use its 22-character ID containing letters and numbers, without a URI or URL.
-4. Open **Actions → Playlist tools → Run workflow**, choose `duplicates`, `backup`, `sort`, `compare`, or `merge`, and optionally enter another 22-character playlist ID. Actions accepts IDs only. For sorting, select a sort key and direction. For comparison, enter `other_playlist_id`. For merging, the selected playlist is the destination; enter source IDs separated by spaces or newlines in `source_playlist_ids`. Sort and merge write to Spotify.
+3. Optionally, add a repository variable named `SPOTIFY_PLAYLIST_ID` for your default playlist; without it, enter `playlist_id` on every run that asks for one. Use its 22-character ID containing letters and numbers, without a URI or URL.
+4. Open **Actions**, pick a workflow, and choose **Run workflow**. Each operation has its own workflow showing only its inputs: **Find duplicates**, **Back up playlist**, **Sort playlist** (sort key and direction), **Compare playlists** (`other_playlist_id`), and **Merge playlists** (the selected playlist is the destination; enter source IDs separated by spaces or newlines in `source_playlist_ids`). Actions accepts IDs only. Sort and merge write to Spotify. All of them share the job in `.github/workflows/run.yml`.
 
 The run uploads an artifact named `spot-on-RUN_ID-ATTEMPT`, containing `reports/` and any `backups/`. Artifacts are retained for 30 days; download backups you want to keep longer. Backups and reports contain playlist information, so use a private fork if that information should be private. Credentials are supplied as secrets and are not included in these files.
 
-Scheduled sorting is disabled until you add the repository variable `SPOTIFY_ENABLE_SCHEDULE` with the exact value `true`. Once enabled, the default playlist is sorted daily at 02:00 UTC (10:00 in Malaysia). Optional repository variables `SPOTIFY_SORT_BY` and `SPOTIFY_SORT_ORDER` select the sort key and `asc` or `desc`; without them, sorting uses release date, newest first. Remove the enable variable or change its value to disable the schedule.
+All workflows, including CI, run only when started manually from the Actions tab; none run on a schedule, push, or pull request.
 
 For batches, commit your configured `batch.json` to the default branch, then open **Actions → Batch playlist tools → Run workflow**. This manual run executes all jobs. Use the `config_file` input or repository variable `SPOTIFY_BATCH_CONFIG` to select another repository path. The default is `batch.json`; the example file is never loaded automatically.
-
-Set repository variable `SPOTIFY_ENABLE_BATCH_SCHEDULE` to exactly `true` to enable hourly checks of each job's schedule. This is independent of the single-playlist schedule. Scheduled runs use `batch-due` and execute only jobs matching the UTC hour when the command starts. GitHub schedules are best effort and may be delayed or skipped, so a run delayed into another hour can miss a job. There is no catch-up or durable execution history; manual batch runs execute all jobs regardless of schedule, and rerunning `batch-due` in the same hour executes that hour's jobs again. Both scheduled workflows use the default branch. Disable scheduling by removing the relevant enable variable or changing its value.
 
 To restore a backup in Actions, open **Restore playlist order → Run workflow** and enter:
 
