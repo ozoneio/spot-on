@@ -33,6 +33,7 @@ def test_backup_round_trip_preserves_unavailable_and_nontrack_entries(tmp_path: 
     backup = read_backup(first_path)
 
     assert first_path != second_path
+    assert first_path.name.startswith("My-playlist-")
     assert read_backup(second_path).entries == entries
     assert backup.format_version == 1
     assert backup.playlist_id == playlist.id
@@ -40,6 +41,12 @@ def test_backup_round_trip_preserves_unavailable_and_nontrack_entries(tmp_path: 
     assert backup.snapshot_id == playlist.snapshot_id
     assert earliest <= backup.backed_up_at <= datetime.now(UTC)
     assert backup.entries == entries
+
+
+def test_backup_filename_falls_back_when_name_has_no_ascii(tmp_path: Path) -> None:
+    playlist = PlaylistMetadata(id="0000000000000000000001", name="🎧 夜", snapshot_id="s")
+
+    assert write_backup(tmp_path, playlist, ()).name.startswith("playlist-")
 
 
 def test_local_file_json_without_release_dates_survives_backup(tmp_path: Path) -> None:

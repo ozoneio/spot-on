@@ -1,5 +1,6 @@
 """Versioned playlist metadata backups used to restore track order."""
 
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
@@ -35,7 +36,9 @@ def write_backup(
         backed_up_at=now,
         entries=entries,
     )
-    path = directory / f"playlist-{now.strftime('%Y%m%dT%H%M%S%fZ')}-{uuid4().hex}.json"
+    # ASCII-only to pass the restore workflow's backup_file check; non-ASCII names fall back.
+    name = re.sub(r"[^A-Za-z0-9]+", "-", playlist.name).strip("-")[:50].strip("-") or "playlist"
+    path = directory / f"{name}-{now.strftime('%Y%m%d')}-{uuid4().hex}.json"
     try:
         directory.mkdir(parents=True, exist_ok=True)
         with path.open("x", encoding="utf-8") as output:
