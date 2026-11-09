@@ -43,15 +43,17 @@ def assert_snapshot(client: SpotifyClient, playlist_id: str, snapshot_id: str) -
 def apply_order(
     client: SpotifyClient, playlist_id: str, snapshot_id: str, positions: tuple[int, ...]
 ) -> None:
-    """Apply planned single-entry moves with a current snapshot before each request."""
-    moves = reorder_moves(positions)
+    """Apply planned single-entry moves, chaining each write's snapshot into the next.
+
+    No GET check between writes: Spotify's playlist GET is cached and can return the
+    pre-write snapshot for longer than any sane retry, failing the sort on its own edits.
+    The snapshot_id sent with each reorder is what anchors the move to the planned order.
+    """
     current_snapshot = snapshot_id
-    for move in moves:
-        assert_snapshot(client, playlist_id, current_snapshot)
+    for move in reorder_moves(positions):
         current_snapshot = client.reorder(
             playlist_id, move.range_start, move.insert_before, current_snapshot
         )
-    assert_snapshot(client, playlist_id, current_snapshot)
 
 
 def sort_playlist(
